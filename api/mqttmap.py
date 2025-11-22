@@ -253,6 +253,7 @@ A1790_0405 = {
     },  # 12V DC output switch: Disabled (0) or Enabled (1)
     "cc": {"name": "device_sn"},
     "cd": {"name": "ac_input_limit"},  # User Setting (AC Charge Watts)
+    "ce": {"name": "device_timeout_minutes"},  # Auto Power Off timeout setting in Minutes
     "cf": {"name": "display_timeout_seconds"},  # User Setting (in seconds)
     "d3": {"name": "ac_output_power_switch_dup?"},  # Duplicate of bc?
     "d4": {"name": "dc_output_power_switch_dup?"},  # Duplicate of c7?

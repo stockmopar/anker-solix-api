@@ -1235,6 +1235,19 @@ def generate_mqtt_command(  # noqa: C901
                     f_value=timeout_minutes.to_bytes(length=2, byteorder="little"),
                 )
             )
+        elif command == "f3800_screen_timeout":
+            timeout_seconds = int(parameters.get("timeout_seconds", 30))
+            hexdata = DeviceHexData(
+                model="A1790P", msg_header=DeviceHexDataHeader(cmd_msg="0046")
+            )
+            hexdata.update_field(DeviceHexDataField(hexbytes="a10122"))
+            hexdata.update_field(
+                DeviceHexDataField(
+                    f_name=bytes.fromhex("a2"),
+                    f_type=DeviceHexDataTypes.sile.value,
+                    f_value=timeout_seconds.to_bytes(length=2, byteorder="little"),
+                )
+            )
         elif command == "f3800_max_load":
             max_watts = int(parameters.get("max_watts", 1800))
             hexdata = DeviceHexData(

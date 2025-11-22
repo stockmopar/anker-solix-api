@@ -33,6 +33,7 @@ class SolixMqttCommands:
     sb_status_check: str = "sb_status_check"
     sb_power_cutoff_select: str = "sb_power_cutoff_select"
     sb_inverter_type_select: str = "sb_inverter_type_select"
+    screen_timeout_seconds: str = "screen_timeout_seconds"
 
     def asdict(self) -> dict:
         """Return a dictionary representation of the class fields."""

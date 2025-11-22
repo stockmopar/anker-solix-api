@@ -642,6 +642,38 @@ class SolixMqttDeviceF3800(SolixMqttDevice):
                     self._filedata["device_timeout_minutes"] = timeout_minutes
         return resp or False
 
+    async def set_screen_timeout(
+        self,
+        timeout_seconds: int | None = None,
+        toFile: bool = False,
+    ) -> dict | bool:
+        """Set screen timeout.
+
+        Args:
+            timeout_seconds: Timeout in seconds (e.g. 30)
+            toFile: If True, return mock response (for testing compatibility)
+
+        Returns:
+            dict: Response with screen_timeout_seconds if successful, False otherwise
+
+        Example:
+            # Set 30 second timeout
+            result = await device.set_screen_timeout(timeout_seconds=30)
+        """
+        resp = {}
+        # TODO: Add validation for screen timeout values if known (e.g. 30, 60, 300, 1800)
+        if timeout_seconds is not None:
+            if toFile or await self._send_mqtt_command(
+                command="f3800_screen_timeout",
+                parameters={"timeout_seconds": timeout_seconds},
+                description=f"Screen timeout set to {timeout_seconds} seconds",
+                toFile=toFile,
+            ):
+                resp["screen_timeout_seconds"] = timeout_seconds
+                if toFile:
+                    self._filedata["screen_timeout_seconds"] = timeout_seconds
+        return resp or False
+
     async def set_max_load(
         self,
         max_watts: int | None = None,
