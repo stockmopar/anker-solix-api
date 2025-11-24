@@ -508,7 +508,7 @@ class DeviceHexData:
             return self.hexbytes.hex(sep=sep)
         return self.hexbytes.hex()
 
-    def decode(self) -> str:
+    def decode(self, filters: set[str] | None = None) -> str:
         """Return the field representation in human readable format."""
         if self.length > 0:
             msgtype = self.msg_header.msgtype.hex()
@@ -539,11 +539,78 @@ class DeviceHexData:
                         and "timestamp" in str(name)
                     ):
                         name = f"{name} ({datetime.fromtimestamp(int.from_bytes(f.f_value, byteorder='little', signed=True)).strftime('%Y-%m-%d %H:%M:%S')})"
-                    s += f"\n{f.decode().rstrip()}{(Color.CYAN + ' --> ' + str(name) + ('' if factor is None else ' (factor ' + str(factor) + ')') + Color.OFF) if name else ''}"
+                    
+                    # Redact sensitive fields
+                    decoded_field = f.decode().rstrip()
+                    is_sensitive = False
+                    if filters:
+                        # Check if any filter string is present in the decoded field
+                        for filter_str in filters:
+                            if filter_str and len(filter_str) > 4 and filter_str in decoded_field:
+                                is_sensitive = True
+                                break
+                    
+                    if not is_sensitive and isinstance(name, str) and ("sn" in name.lower() or "id" in name.lower() or "serial" in name.lower()):
+                        is_sensitive = True
+
+                    if is_sensitive:
+                         decoded_field = f"{f.f_name.hex():<4} {f.f_length:<3} {f.f_type.hex():<4}  *** (REDACTED) ***\n{'└->':<3} --> {name} (REDACTED)" if name else f"{f.f_name.hex():<4} {f.f_length:<3} {f.f_type.hex():<4}  *** (REDACTED) ***"
+
+                    s += f"\n{decoded_field}{(Color.CYAN + ' --> ' + str(name) + ('' if factor is None else ' (factor ' + str(factor) + ')') + Color.OFF) if name and not is_sensitive else ''}"
                 s += f"\n{80 * '-'}"
         else:
             s = ""
         return s
+
+    def redacted_hex(self, filters: set[str] | None = None) -> str:
+        """Return the hex string with sensitive fields redacted."""
+        # Create a list of string representations of bytes
+        hex_list = [f"{b:02x}" for b in self.hexbytes]
+        
+        # Get field map
+        msgtype = self.msg_header.msgtype.hex()
+        fieldmap = (
+            (SOLIXMQTTMAP.get(self.model).get(msgtype) or {})
+            if self.model in SOLIXMQTTMAP
+            else {}
+        )
+
+        # Iterate fields to find sensitive ones
+        # We assume fields are contiguous starting after header
+        idx = len(self.msg_header)
+        
+        for f in self.msg_fields.values():
+            # Calculate current field length: 1 (name) + 1 (len) + length
+            field_total_len = int(f.f_length) + 2
+            
+            # Check sensitivity
+            name = (
+                (fld := fieldmap.get(f.f_name.hex()) or {}).get("name")
+                or (fld.get("bytes") or {})
+                or ""
+            )
+            
+            is_sensitive = False
+            # Check filters
+            if filters:
+                decoded_val = f.decode().rstrip()
+                for filter_str in filters:
+                    if filter_str and len(filter_str) > 4 and filter_str in decoded_val:
+                        is_sensitive = True
+                        break
+            
+            if not is_sensitive and isinstance(name, str) and ("sn" in name.lower() or "id" in name.lower() or "serial" in name.lower()):
+                is_sensitive = True
+            
+            if is_sensitive:
+                # Redact value bytes (indices idx+2 to idx+field_total_len)
+                for i in range(idx + 2, idx + field_total_len):
+                    if i < len(hex_list):
+                        hex_list[i] = "**"
+            
+            idx += field_total_len
+            
+        return ":".join(hex_list)
 
     def asdict(self) -> dict:
         """Return a dictionary representation of the class fields."""

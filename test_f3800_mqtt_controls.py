@@ -47,6 +47,7 @@ async def main():
 
         # Example commands using F3800 wrapper methods
         try:
+
             # Generate AC output ON hex (test mode, no publish)
             CONSOLE.info("\nGenerating AC output ON hex (test mode, no publish)...")
             await mqttdevice.set_ac_output(enabled=True, toFile=True)
@@ -87,8 +88,23 @@ async def main():
             CONSOLE.info(f"Restore max load to 200W: {'Success' if result else 'Failed'}")
             await asyncio.sleep(2)
 
-            # Set Real-Time Data ON (not implemented in wrapper yet)
-            # You may add a wrapper for this in the future
+            # Test screen timeout values
+            CONSOLE.info("\nTesting screen timeout values...")
+            timeout_values = [20, 30, 60, 300, 1800]  # 30s, 1min, 5min, 30min
+            for timeout in timeout_values:
+                CONSOLE.info(f"\nSetting screen timeout to {timeout} seconds...")
+                result = await mqttdevice.set_screen_timeout(timeout_seconds=timeout)
+                CONSOLE.info(f"Set screen timeout to {timeout}s: {'Success' if result else 'Failed'}")
+                await asyncio.sleep(2)
+
+            # Test device timeout values (auto-off)
+            CONSOLE.info("\nTesting device timeout values (auto-off)...")
+            device_timeout_values = [0, 30, 60, 120, 240, 480, 720, 1440]  # 0=Never, 30min, 1hr, 2hr, 4hr, 8hr, 12hr, 24hr
+            for timeout in device_timeout_values:
+                CONSOLE.info(f"\nSetting device timeout to {timeout} minutes...")
+                result = await mqttdevice.set_device_timeout(timeout_minutes=timeout)
+                CONSOLE.info(f"Set device timeout to {timeout}min: {'Success' if result else 'Failed'}")
+                await asyncio.sleep(2)
 
             # Return to normal settings
             CONSOLE.info("\nReturning to normal settings...")

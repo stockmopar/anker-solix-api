@@ -57,7 +57,7 @@ class SolixMqttDeviceF3800(SolixMqttDevice):
             "light_mode_select": lambda v: v in [0, 1, 2, 3, 4],
             "dc_output_mode_select": lambda v: v in [1, 2],
             "ac_output_mode_select": lambda v: v in [1, 2],
-            "device_timeout_minutes": lambda v: 30 <= v <= 1440,
+            "device_timeout_minutes": lambda v: v == 0 or 30 <= v <= 1440,  # 0 = Never
             "max_load": lambda v: 100 <= v <= 2000,
         }
         rule = validation_rules.get(command_id)

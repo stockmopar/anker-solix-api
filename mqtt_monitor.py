@@ -444,15 +444,27 @@ class AnkerSolixMqttMonitor:
             timestamp = datetime.fromtimestamp(
                 (message.get("head") or {}).get("timestamp") or 0
             ).strftime("%Y-%m-%d %H:%M:%S ")
-        CONSOLE.info(f"\nReceived message on topic: {topic}\n{message}")
+        
+        # Prepare filters for redaction
+        filters = set()
+        if isinstance(message, dict):
+             payload = json.loads(message.get("payload") or "{}")
+             if sn := payload.get("sn"):
+                 filters.add(sn)
+             if sn := (message.get("head") or {}).get("device_sn"):
+                 filters.add(sn)
+             if client_id := (message.get("head") or {}).get("client_id"):
+                 filters.add(client_id)
+
+        CONSOLE.info(f"\nReceived message on topic: {session._redact(topic, filters=filters.copy())}\n{session._redact(message, filters=filters.copy())}")
         if isinstance(data, bytes):
-            CONSOLE.info(f"{timestamp}Device hex data:\n{data.hex(':')}")
             # structure hex data
             hd = DeviceHexData(model=model or "", hexbytes=data)
-            CONSOLE.info(hd.decode())
+            CONSOLE.info(f"{timestamp}Device hex data:\n{hd.redacted_hex(filters=filters)}")
+            CONSOLE.info(hd.decode(filters=filters))
         elif data:
             # no encoded data in message, dump object whatever it is
-            CONSOLE.info(f"{timestamp}Device data:\n{json.dumps(data, indent=2)}")
+            CONSOLE.info(f"{timestamp}Device data:\n{json.dumps(session._redact(data, filters=filters.copy()), indent=2)}")
 
     def print_table(self) -> None:
         """Print the accumulated extracted values in a table."""
@@ -512,18 +524,31 @@ class AnkerSolixMqttMonitor:
             f"Active topic: {Color.GREEN}{str(session.subscriptions or '')[1:-1]}{Color.OFF}"
         )
         CONSOLE.info(f"{session.mqtt_stats!s}")
+        
+        # Prepare filters for redaction
+        filters = set()
+        if isinstance(message, dict):
+             payload = json.loads(message.get("payload") or "{}")
+             if sn := payload.get("sn"):
+                 filters.add(sn)
+             if sn := (message.get("head") or {}).get("device_sn"):
+                 filters.add(sn)
+             if client_id := (message.get("head") or {}).get("client_id"):
+                 filters.add(client_id)
+
         if message:
             CONSOLE.info(
-                f"{timestamp}: Received message '{Color.YELLOW + hd.msg_header.msgtype.hex(':') + Color.OFF}' on topic: {Color.YELLOW + topic + Color.OFF}"
+                f"{timestamp}: Received message '{Color.YELLOW + hd.msg_header.msgtype.hex(':') + Color.OFF}' on topic: {Color.YELLOW + session._redact(topic, filters=filters.copy()) + Color.OFF}"
             )
         self.print_table()
         if message:
-            CONSOLE.info(f"{100 * '-'}\n{message}")
+            CONSOLE.info(f"{100 * '-'}\n{session._redact(message, filters=filters.copy())}")
             if isinstance(data, bytes):
-                CONSOLE.info(f"Device hex data:\n{data.hex(':')}")
+                CONSOLE.info(f"Device hex data:\n{hd.redacted_hex(filters=filters)}")
+                CONSOLE.info(hd.decode(filters=filters))
             elif data:
                 # no encoded data in message, dump object whatever it is
-                CONSOLE.info(f"Device data:\n{json.dumps(data, indent=2)}")
+                CONSOLE.info(f"Device data:\n{json.dumps(session._redact(data, filters=filters.copy()), indent=2)}")
 
 
 class ReplaceFilter(logging.Filter):

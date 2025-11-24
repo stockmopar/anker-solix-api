@@ -1097,6 +1097,11 @@ SOLIXMQTTMAP = {
         "0050": CMD_TEMP_UNIT,  # Temperature unit switch: Celsius (0) or Fahrenheit (1)
         "0052": CMD_DISPLAY_SWITCH,
         # TODO: Command available for Display timeout setting? Which options are available?
+        "0030": {
+            # Command response message
+            "topic": "req",
+            "a2": {"name": "account_id"},
+        },
         "0057": CMD_REALTIME_TRIGGER,
         "0076": CMD_DC_12V_OUTPUT_MODE,  # Normal (1), Off (0)
         "0077": CMD_AC_OUTPUT_MODE,  # Normal (1), Off (0)
@@ -1109,6 +1114,8 @@ SOLIXMQTTMAP = {
         "0410": A1790_0410,
         # Interval: ??
         "0804": A1790_0804,
+        # Interval: ??
+        "0840": A1790_0405,
         # Interval: Irregular, triggered on app actions, no fixed interval
         "0830": PPS_VERSIONS_0830,
     },

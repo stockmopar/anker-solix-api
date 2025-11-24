@@ -104,6 +104,74 @@ class AnkerSolixMqttSession:
                         topic,
                     )
 
+    def _redact(self, data: Any, filters: set[str] | None = None) -> Any:
+        """Redact sensitive information from data for logging."""
+        if filters is None:
+            filters = set()
+        
+        # Add known sensitive info from session
+        if self.mqtt_info:
+            for k in [
+                "user_id",
+                "email",
+                "phone",
+                "client_id",
+                "certificate_id",
+                "access_key",
+                "gtoken",
+            ]:
+                if val := self.mqtt_info.get(k):
+                    filters.add(str(val))
+
+        sensitive_keys = {
+            "client_id",
+            "sess_id",
+            "sn",
+            "device_sn",
+            "user_id",
+            "account_id",
+            "uid",
+            "email",
+            "phone",
+            "certificate_id",
+            "access_key",
+            "gtoken",
+        }
+
+        if isinstance(data, dict):
+            new_data = {}
+            for k, v in data.items():
+                if k in sensitive_keys:
+                    if isinstance(v, str) and v:
+                        filters.add(v)
+                    new_data[k] = "***"
+                elif k == "data" and isinstance(v, str) and len(v) > 50:
+                    # Heuristic: Long string in 'data' is likely Base64 encoded binary with potential PII
+                    new_data[k] = "*** (REDACTED BASE64) ***"
+                else:
+                    new_data[k] = self._redact(v, filters)
+            return new_data
+        elif isinstance(data, list):
+            return [self._redact(item, filters) for item in data]
+        elif isinstance(data, str):
+            # Try to parse as JSON first
+            try:
+                json_data = json.loads(data)
+                # If it's a dict or list, recurse
+                if isinstance(json_data, (dict, list)):
+                    redacted_json = self._redact(json_data, filters)
+                    return json.dumps(redacted_json)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            # Perform string replacement for filters
+            for f in filters:
+                if f and len(f) > 4 and f in data:  # Avoid redacting short common strings
+                    data = data.replace(f, "***")
+            return data
+
+        return data
+
     def on_message(
         self, client: mqtt.Client, userdata: mqtt.Any, msg: mqtt.MQTTMessage
     ):
@@ -130,12 +198,18 @@ class AnkerSolixMqttSession:
         data = (payload.get("data")) if isinstance(payload, dict) else None
         # Decrypt base64-encoded encrypted data field from expected dictionary in message payload
         data = b64decode(data) if isinstance(data, str) else data
+        
+        # Prepare filters for redaction
+        filters = set()
+        if device_sn:
+            filters.add(device_sn)
+            
         self._logger.debug(
             "Api %s MQTT session client received message dated %s: %s on topic: %s",
             self.apisession.nickname,
             timestamp,
-            message,
-            msg.topic,
+            self._redact(message, filters=filters.copy()),
+            self._redact(msg.topic, filters=filters.copy()),
         )
         valueupdate = False
         # Update data stats
@@ -162,7 +236,7 @@ class AnkerSolixMqttSession:
                 self.apisession.nickname,
                 device_sn,
                 model,
-                str(data),
+                self._redact(str(data), filters=filters.copy()),
             )
         # call message callback if defined
         if callable(self._message_callback):
@@ -683,7 +757,7 @@ class AnkerSolixMqttSession:
                                 "Api %s MQTT session published message: %s\n%s",
                                 self.apisession.nickname,
                                 response,
-                                message,
+                                self._redact(message),
                             )
                     triggered_devices = trigger_devices.copy()
                     # restart timeout interval
@@ -794,7 +868,7 @@ class AnkerSolixMqttSession:
                                 datetime.fromtimestamp(timestamps[time_idx]).strftime(
                                     "%Y-%m-%d %H:%M:%S"
                                 ),
-                                message,
+                                self._redact(message),
                             )
                             # mock timestamp in message for subsequent cycles
                             if addtime > 0 and (
